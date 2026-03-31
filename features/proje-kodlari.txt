@@ -1,0 +1,957 @@
+<!doctype html>
+<html lang="tr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>FoodWise AI • Dashboard (MVP)</title>
+    <meta
+      name="description"
+      content="Üniversite öğrencileri için bilişsel aşırı yükü azaltan, sürdürülebilirlik odaklı akıllı envanter ve tarif dashboard'u."
+    />
+
+    <!-- Font Awesome -->
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css"
+      referrerpolicy="no-referrer"
+    />
+
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+
+    <style>
+      :root {
+        --bg: #09090b; /* zinc-950 */
+        --panel: rgba(24, 24, 27, 0.72); /* zinc-900-ish */
+        --panel2: rgba(39, 39, 42, 0.55); /* zinc-800-ish */
+        --stroke: rgba(255, 255, 255, 0.08);
+        --text: rgba(255, 255, 255, 0.92);
+        --muted: rgba(255, 255, 255, 0.64);
+        --emerald: #10b981; /* emerald-500 */
+        --emerald2: rgba(16, 185, 129, 0.15);
+        --danger: #ef4444;
+        --warning: #f97316;
+        --ok: #22c55e;
+        --shadow: 0 18px 60px rgba(0, 0, 0, 0.55);
+        --radius: 18px;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        height: 100%;
+      }
+      body {
+        margin: 0;
+        font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial,
+          "Apple Color Emoji", "Segoe UI Emoji";
+        background: radial-gradient(1200px 500px at 12% -10%, rgba(16, 185, 129, 0.22), transparent),
+          radial-gradient(900px 450px at 90% 0%, rgba(99, 102, 241, 0.14), transparent), var(--bg);
+        color: var(--text);
+      }
+
+      .container {
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 28px 18px 38px;
+      }
+
+      header {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 16px;
+        margin-bottom: 18px;
+      }
+
+      .brand {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
+      .brand h1 {
+        margin: 0;
+        font-size: 22px;
+        font-weight: 760;
+        letter-spacing: 0.2px;
+      }
+      .brand p {
+        margin: 0;
+        color: var(--muted);
+        font-size: 13.5px;
+        line-height: 1.35;
+      }
+
+      .top-actions {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        flex-wrap: wrap;
+        justify-content: flex-end;
+      }
+
+      .chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+        padding: 10px 12px;
+        border-radius: 999px;
+        background: rgba(24, 24, 27, 0.55);
+        border: 1px solid var(--stroke);
+        box-shadow: 0 8px 30px rgba(0, 0, 0, 0.25);
+        backdrop-filter: blur(12px);
+      }
+      .chip label {
+        color: var(--muted);
+        font-size: 12.5px;
+      }
+      .chip select {
+        background: rgba(255, 255, 255, 0.04);
+        border: 1px solid var(--stroke);
+        color: var(--text);
+        border-radius: 999px;
+        padding: 7px 10px;
+        outline: none;
+      }
+
+      .toggle {
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+        padding: 10px 12px;
+        border-radius: 999px;
+        background: rgba(24, 24, 27, 0.55);
+        border: 1px solid var(--stroke);
+        box-shadow: 0 8px 30px rgba(0, 0, 0, 0.25);
+        backdrop-filter: blur(12px);
+        user-select: none;
+      }
+      .toggle .toggle-text {
+        font-size: 12.5px;
+        color: var(--muted);
+        white-space: nowrap;
+      }
+      .switch {
+        position: relative;
+        width: 46px;
+        height: 26px;
+        border-radius: 999px;
+        border: 1px solid var(--stroke);
+        background: rgba(255, 255, 255, 0.06);
+        cursor: pointer;
+        transition: 0.18s ease;
+      }
+      .switch::after {
+        content: "";
+        position: absolute;
+        width: 20px;
+        height: 20px;
+        top: 2px;
+        left: 2px;
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.85);
+        box-shadow: 0 8px 18px rgba(0, 0, 0, 0.35);
+        transition: 0.18s ease;
+      }
+      input[type="checkbox"] {
+        display: none;
+      }
+      input[type="checkbox"]:checked + .switch {
+        background: rgba(16, 185, 129, 0.22);
+        border-color: rgba(16, 185, 129, 0.35);
+      }
+      input[type="checkbox"]:checked + .switch::after {
+        left: 22px;
+        background: #d1fae5;
+      }
+
+      .grid {
+        display: grid;
+        grid-template-columns: 1.05fr 1.35fr;
+        gap: 14px;
+      }
+
+      @media (max-width: 980px) {
+        .grid {
+          grid-template-columns: 1fr;
+        }
+      }
+
+      .planner-grid {
+        display: grid;
+        grid-template-columns: repeat(7, minmax(220px, 1fr));
+        gap: 10px;
+        overflow-x: auto;
+        padding-bottom: 6px;
+        position: relative;
+        z-index: 1;
+      }
+      #weekly-planner .row {
+        position: relative;
+        z-index: 2;
+      }
+      .day {
+        border: 1px solid var(--stroke);
+        background: rgba(255, 255, 255, 0.03);
+        border-radius: 16px;
+        padding: 12px;
+        min-height: 260px;
+      }
+      .day h3 {
+        margin: 0 0 8px;
+        font-size: 13px;
+        letter-spacing: 0.2px;
+        text-transform: uppercase;
+        color: rgba(255, 255, 255, 0.8);
+      }
+      .small {
+        font-size: 12px;
+        color: rgba(255, 255, 255, 0.6);
+      }
+      .mini-row {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 8px;
+        margin-top: 8px;
+      }
+      .mini-row input[type="text"] {
+        padding: 10px 10px;
+        border-radius: 12px;
+      }
+      .mini-row input[type="time"] {
+        width: 100%;
+        padding: 10px 10px;
+        border-radius: 12px;
+        border: 1px solid var(--stroke);
+        background: rgba(255, 255, 255, 0.04);
+        color: var(--text);
+        outline: none;
+      }
+      .mini-row input[type="time"]:focus {
+        border-color: rgba(16, 185, 129, 0.5);
+        box-shadow: 0 0 0 4px rgba(16, 185, 129, 0.12);
+      }
+      .meal {
+        margin-top: 10px;
+        border: 1px solid rgba(16, 185, 129, 0.25);
+        background: rgba(16, 185, 129, 0.05);
+        border-radius: 14px;
+        padding: 10px;
+      }
+      .meal.fast {
+        border-color: rgba(249, 115, 22, 0.35);
+        background: rgba(249, 115, 22, 0.07);
+      }
+      .meal.fast .meal-title {
+        color: rgba(255, 237, 213, 0.9);
+      }
+      .meal .meal-title {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 6px;
+        font-size: 12px;
+        color: rgba(255, 255, 255, 0.72);
+        text-transform: uppercase;
+        letter-spacing: 0.2px;
+      }
+      .meal textarea {
+        width: 100%;
+        min-height: 46px;
+        resize: vertical;
+        padding: 10px;
+        border-radius: 12px;
+        border: 1px solid var(--stroke);
+        background: rgba(255, 255, 255, 0.03);
+        color: var(--text);
+        outline: none;
+      }
+      .slot {
+        border: 1px solid var(--stroke);
+        border-radius: 12px;
+        padding: 8px 10px;
+        display: flex;
+        justify-content: space-between;
+        gap: 8px;
+        align-items: center;
+        margin-top: 8px;
+        background: rgba(255,255,255,0.02);
+      }
+      .slot b {
+        font-size: 12px;
+        color: rgba(255,255,255,0.8);
+      }
+
+      .card {
+        border-radius: var(--radius);
+        border: 1px solid var(--stroke);
+        background: linear-gradient(180deg, rgba(24, 24, 27, 0.72), rgba(9, 9, 11, 0.5));
+        box-shadow: var(--shadow);
+        padding: 16px;
+        overflow: hidden;
+      }
+
+      .card-header {
+        display: flex;
+        justify-content: space-between;
+        gap: 12px;
+        align-items: center;
+        margin-bottom: 14px;
+      }
+      .card-title {
+        display: inline-flex;
+        gap: 10px;
+        align-items: center;
+      }
+      .card-title h2 {
+        margin: 0;
+        font-size: 14px;
+        letter-spacing: 0.28px;
+        text-transform: uppercase;
+        color: rgba(255, 255, 255, 0.82);
+      }
+      .card-title i {
+        color: var(--emerald);
+      }
+
+      .subtle {
+        color: var(--muted);
+        font-size: 13px;
+      }
+
+      .row {
+        display: grid;
+        grid-template-columns: 1.25fr 0.85fr;
+        gap: 10px;
+        margin-bottom: 10px;
+      }
+      @media (max-width: 520px) {
+        .row {
+          grid-template-columns: 1fr;
+        }
+      }
+
+      input[type="text"],
+      input[type="date"] {
+        width: 100%;
+        padding: 12px 12px;
+        border-radius: 14px;
+        border: 1px solid var(--stroke);
+        background: rgba(255, 255, 255, 0.04);
+        color: var(--text);
+        outline: none;
+        transition: 0.16s ease;
+      }
+      select {
+        width: 100%;
+        padding: 12px 12px;
+        border-radius: 14px;
+        border: 1px solid var(--stroke);
+        background: rgba(255, 255, 255, 0.04);
+        color: var(--text);
+        outline: none;
+        transition: 0.16s ease;
+      }
+      select:focus {
+        border-color: rgba(16, 185, 129, 0.5);
+        box-shadow: 0 0 0 4px rgba(16, 185, 129, 0.12);
+      }
+      input[type="text"]:focus,
+      input[type="date"]:focus {
+        border-color: rgba(16, 185, 129, 0.5);
+        box-shadow: 0 0 0 4px rgba(16, 185, 129, 0.12);
+      }
+
+      .btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 9px;
+        justify-content: center;
+        padding: 11px 12px;
+        border-radius: 14px;
+        border: 1px solid rgba(16, 185, 129, 0.35);
+        background: linear-gradient(180deg, rgba(16, 185, 129, 0.18), rgba(16, 185, 129, 0.1));
+        color: rgba(209, 250, 229, 0.95);
+        cursor: pointer;
+        transition: 0.16s ease;
+        font-weight: 650;
+      }
+      .btn:hover {
+        transform: translateY(-1px);
+        border-color: rgba(16, 185, 129, 0.55);
+        box-shadow: 0 10px 28px rgba(0, 0, 0, 0.35);
+      }
+      .btn:active {
+        transform: translateY(0px);
+      }
+      .btn.secondary {
+        border-color: var(--stroke);
+        background: rgba(255, 255, 255, 0.03);
+        color: rgba(255, 255, 255, 0.86);
+      }
+      .btn.secondary:hover {
+        border-color: rgba(255, 255, 255, 0.18);
+      }
+      .btn.danger {
+        border-color: rgba(239, 68, 68, 0.32);
+        background: linear-gradient(180deg, rgba(239, 68, 68, 0.15), rgba(239, 68, 68, 0.08));
+        color: rgba(254, 226, 226, 0.92);
+      }
+      .btn.warning {
+        border-color: rgba(249, 115, 22, 0.32);
+        background: linear-gradient(180deg, rgba(249, 115, 22, 0.15), rgba(249, 115, 22, 0.08));
+        color: rgba(255, 237, 213, 0.94);
+      }
+      .btn:disabled {
+        opacity: 0.45;
+        cursor: not-allowed;
+        transform: none !important;
+        box-shadow: none !important;
+      }
+
+      /* Ensure weekly planner action buttons are always clickable */
+      #plan-to-market-btn,
+      #plan-variety-btn,
+      #ai-plan-btn,
+      #clear-plan-btn {
+        position: relative;
+        z-index: 999;
+        pointer-events: auto;
+      }
+
+      ul.clean {
+        list-style: none;
+        padding: 0;
+        margin: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
+      .item {
+        border: 1px solid var(--stroke);
+        background: rgba(255, 255, 255, 0.03);
+        border-radius: 16px;
+        padding: 12px;
+        display: grid;
+        grid-template-columns: 1fr auto;
+        gap: 10px;
+      }
+      .item-meta {
+        display: flex;
+        flex-direction: column;
+        gap: 5px;
+        min-width: 0;
+      }
+      .item-name {
+        font-weight: 720;
+        letter-spacing: 0.2px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      .pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        width: fit-content;
+        padding: 6px 10px;
+        border-radius: 999px;
+        border: 1px solid var(--stroke);
+        background: rgba(255, 255, 255, 0.03);
+        color: var(--muted);
+        font-size: 12px;
+      }
+      .pill strong {
+        color: rgba(255, 255, 255, 0.86);
+        font-weight: 700;
+      }
+
+      .badge-critical {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 6px 10px;
+        border-radius: 999px;
+        border: 1px solid rgba(239, 68, 68, 0.35);
+        background: rgba(239, 68, 68, 0.1);
+        color: rgba(254, 226, 226, 0.95);
+        font-size: 12px;
+        font-weight: 750;
+        letter-spacing: 0.2px;
+        width: fit-content;
+      }
+      .pulse-dot {
+        width: 9px;
+        height: 9px;
+        border-radius: 999px;
+        background: rgba(239, 68, 68, 0.95);
+        box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.55);
+        animation: pulse 1.1s infinite;
+      }
+      @keyframes pulse {
+        0% {
+          box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.55);
+          transform: scale(1);
+        }
+        70% {
+          box-shadow: 0 0 0 10px rgba(239, 68, 68, 0);
+          transform: scale(1.03);
+        }
+        100% {
+          box-shadow: 0 0 0 0 rgba(239, 68, 68, 0);
+          transform: scale(1);
+        }
+      }
+
+      .success-glow {
+        border-color: rgba(16, 185, 129, 0.55) !important;
+        box-shadow: 0 0 0 4px rgba(16, 185, 129, 0.12), 0 18px 60px rgba(0, 0, 0, 0.55) !important;
+      }
+      .confetti {
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+        overflow: hidden;
+        border-radius: var(--radius);
+      }
+      .confetti i {
+        position: absolute;
+        width: 8px;
+        height: 14px;
+        opacity: 0.9;
+        top: -20px;
+        animation: fall 900ms ease-out forwards;
+      }
+      @keyframes fall {
+        to {
+          transform: translateY(320px) rotate(220deg);
+          opacity: 0;
+        }
+      }
+      .actions {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        align-items: stretch;
+        min-width: 210px;
+      }
+      @media (max-width: 520px) {
+        .actions {
+          min-width: auto;
+        }
+      }
+
+      .kpis {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 10px;
+        margin-bottom: 10px;
+      }
+      .kpi {
+        border-radius: 16px;
+        border: 1px solid var(--stroke);
+        background: rgba(255, 255, 255, 0.03);
+        padding: 12px;
+      }
+      .kpi .label {
+        font-size: 12px;
+        color: var(--muted);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+      }
+      .kpi .value {
+        margin-top: 6px;
+        font-size: 22px;
+        font-weight: 780;
+        letter-spacing: 0.2px;
+      }
+      .kpi .value span {
+        color: var(--emerald);
+      }
+
+      .recipe-box {
+        margin-top: 12px;
+        border-radius: 16px;
+        border: 1px dashed rgba(16, 185, 129, 0.35);
+        background: rgba(16, 185, 129, 0.06);
+        padding: 12px;
+        min-height: 130px;
+      }
+      .recipe-box .recipe-title {
+        font-weight: 760;
+        margin: 0 0 6px;
+      }
+      .recipe-box pre {
+        margin: 0;
+        white-space: pre-wrap;
+        color: rgba(255, 255, 255, 0.85);
+        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono",
+          "Courier New", monospace;
+        font-size: 12.5px;
+        line-height: 1.4;
+      }
+
+      .chart-wrap {
+        position: relative;
+        width: 100%;
+        height: 250px;
+      }
+      .chart-wrap canvas {
+        width: 100% !important;
+        height: 100% !important;
+        display: block;
+      }
+
+      .footer-note {
+        margin-top: 12px;
+        color: rgba(255, 255, 255, 0.5);
+        font-size: 12px;
+      }
+      a,
+      a:visited {
+        color: rgba(209, 250, 229, 0.95);
+      }
+
+      .fab {
+        position: fixed;
+        right: 18px;
+        bottom: 18px;
+        z-index: 10000;
+      }
+    </style>
+  </head>
+
+  <body>
+    <div class="container">
+      <header>
+        <div class="brand">
+          <h1>FoodWise AI Dashboard</h1>
+          <p>
+            Bilişsel aşırı yükü azaltan, SKT odaklı aksiyonlar + sürdürülebilirlik etkisi. “Şimdi
+            tüket” = otomatik acil tarif.
+          </p>
+        </div>
+
+        <div class="top-actions">
+          <div class="chip" title="Aktif aktivite modu (prompt değişkeni)">
+            <label for="activity-mode"><i class="fa-solid fa-person-running"></i> Aktivite</label>
+            <select id="activity-mode" aria-label="Aktivite Modu">
+              <option value="Ders">Ders</option>
+              <option value="Spor">Spor</option>
+            </select>
+          </div>
+
+          <div class="toggle" title="Vize/Final Modu: tarifler bilişsel yük azaltan formata geçer">
+            <span class="toggle-text"
+              ><i class="fa-solid fa-graduation-cap"></i> Academic Mode</span
+            >
+            <label>
+              <input id="academic-toggle" type="checkbox" />
+              <span class="switch" aria-hidden="true"></span>
+            </label>
+          </div>
+        </div>
+      </header>
+
+      <section class="grid">
+        <div class="card">
+          <div id="market-card-effects" class="confetti" aria-hidden="true"></div>
+          <div class="card-header">
+            <div class="card-title">
+              <i class="fa-solid fa-basket-shopping"></i>
+              <h2>Market List</h2>
+            </div>
+            <span class="subtle">Hızlı ekle → dolaba düşer</span>
+          </div>
+
+          <div class="row">
+            <input id="item-name" type="text" placeholder="Örn: Yoğurt (500g)" autocomplete="off" />
+            <input id="item-expiry" type="date" />
+          </div>
+          <div class="row">
+            <input
+              id="item-weight"
+              type="text"
+              placeholder="Ağırlık (kg) • Örn: 0.5"
+              inputmode="decimal"
+            />
+            <select id="item-location" aria-label="Ürün Konumu">
+              <option value="fridge">Dolap</option>
+              <option value="market">Market</option>
+            </select>
+          </div>
+          <div class="row">
+            <button id="add-btn" class="btn" type="button">
+              <i class="fa-solid fa-plus"></i> Ekle
+            </button>
+            <button id="clear-ai-btn" class="btn secondary" type="button">
+              <i class="fa-solid fa-eraser"></i> AI Temizle
+            </button>
+          </div>
+          <div class="row">
+            <button id="reset-btn" class="btn danger" type="button" title="Tüm verileri sıfırlar">
+              <i class="fa-solid fa-rotate-left"></i> Sıfırla / Tümünü Temizle
+            </button>
+            <button id="reset-impact-btn" class="btn secondary" type="button" title="Sadece KPI + grafik sıfırlar">
+              <i class="fa-solid fa-chart-simple"></i> Etkiyi Sıfırla
+            </button>
+          </div>
+          <div class="row">
+            <input id="api-key-input" type="text" placeholder="Gemini API Key (localStorage'a kaydedilir)" autocomplete="off" />
+            <button id="save-key-btn" class="btn secondary" type="button">
+              <i class="fa-solid fa-key"></i> Key Kaydet
+            </button>
+          </div>
+          <div class="card-header" style="margin-top: 6px">
+            <div class="card-title">
+              <i class="fa-solid fa-check-double"></i>
+              <h2>Alışkanlık Takibi</h2>
+            </div>
+            <span class="subtle">Bugün: <strong id="habit-score">0/3</strong> • Streak: <strong id="habit-streak">0</strong>g</span>
+          </div>
+          <div id="habits-wrap" class="card" style="padding: 12px; background: rgba(255,255,255,0.02); border-radius: 16px;">
+            <div id="habits-effects" class="confetti" aria-hidden="true"></div>
+            <ul id="habits-list" class="clean" aria-label="Alışkanlıklar"></ul>
+          </div>
+          <div class="row" style="margin-top: 10px">
+            <button id="refresh-market-btn" class="btn secondary" type="button" title="Moda göre market önerilerini yeniler">
+              <i class="fa-solid fa-wand-magic-sparkles"></i> Market Önerisini Yenile
+            </button>
+            <button id="reset-habits-btn" class="btn secondary" type="button" title="Alışkanlıklarını sıfırlar">
+              <i class="fa-solid fa-broom"></i> Alışkanlıkları Sıfırla
+            </button>
+          </div>
+          <div class="recipe-box" style="margin-top: 10px; min-height: auto;">
+            <p class="recipe-title"><i class="fa-solid fa-brain"></i> Akıllı Özet</p>
+            <pre id="market-summary" style="min-height:auto;">Moda göre market önerisi için “Yenile”ye bas.</pre>
+          </div>
+          <div class="recipe-box" style="margin-top: 10px; min-height: auto;">
+            <p class="recipe-title"><i class="fa-solid fa-user-gear"></i> Kullanıcı Profili (Bellek)</p>
+            <div class="row" style="margin-top: 8px">
+              <input id="allergies-input" type="text" placeholder="Alerjiler (örn: fındık, laktoz)" autocomplete="off" />
+              <input id="dislikes-input" type="text" placeholder="Sevmediklerim (örn: mantar)" autocomplete="off" />
+            </div>
+            <div class="row" style="margin-top: 8px">
+              <input id="diet-notes-input" type="text" placeholder="Diyet notu (vegan/helal vb.)" autocomplete="off" />
+              <button id="save-profile-btn" class="btn secondary" type="button">
+                <i class="fa-solid fa-floppy-disk"></i> Profili Kaydet
+              </button>
+            </div>
+          </div>
+
+          <ul id="market-list" class="clean" aria-label="Market Listesi"></ul>
+
+          <div class="footer-note">
+            İpucu: SKT’ye göre “ŞİMDİ TÜKET” / “DONDUR/SAKLA” aksiyonları otomatik açılır.
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">
+              <i class="fa-solid fa-box-open"></i>
+              <h2>Dolap & Smart Action</h2>
+            </div>
+            <span class="subtle">Karar yorgunluğu: tek tık aksiyon</span>
+          </div>
+
+          <ul id="fridge-list" class="clean" aria-label="Dolaptakiler"></ul>
+
+          <div class="kpis">
+            <div class="kpi">
+              <div class="label">
+                <span><i class="fa-solid fa-weight-scale"></i> Toplam Kurtarılan</span>
+                <span class="pill"><strong id="items-count">0</strong> ürün</span>
+              </div>
+              <div class="value"><span id="saved-kg">0.0</span> kg</div>
+            </div>
+            <div class="kpi">
+              <div class="label">
+                <span><i class="fa-solid fa-leaf"></i> CO₂ Tasarrufu</span>
+                <span class="pill">x <strong>2.5</strong> kg/ürün</span>
+              </div>
+              <div class="value"><span id="saved-co2">0.0</span> kg</div>
+            </div>
+          </div>
+
+          <div class="card-header" style="margin-top: 2px">
+            <div class="card-title">
+              <i class="fa-solid fa-chart-line"></i>
+              <h2>Sürdürülebilirlik Panosu</h2>
+            </div>
+            <span class="subtle">Gerçek zamanlı güncellenir</span>
+          </div>
+          <div class="chart-wrap" aria-label="Impact Chart Container">
+            <canvas id="impact-chart" aria-label="Impact Chart"></canvas>
+          </div>
+
+          <div class="recipe-box">
+            <p class="recipe-title">
+              <i class="fa-solid fa-wand-magic-sparkles"></i> AI Acil Tarif
+              <span class="subtle" id="recipe-mode-hint"></span>
+            </p>
+            <pre id="recipe-output">Bir ürünü “ŞİMDİ TÜKET” ile tükettiğinde burada acil tarif üretilecek.</pre>
+          </div>
+        </div>
+      </section>
+
+      <section style="margin-top: 14px">
+        <div class="card" id="weekly-planner">
+          <div class="card-header">
+            <div class="card-title">
+              <i class="fa-solid fa-calendar-days"></i>
+              <h2>Haftalık Planlayıcı</h2>
+            </div>
+            <span class="subtle">Ders programı + Kahvaltı/Öğle/Akşam (AI destekli)</span>
+          </div>
+
+          <div class="row">
+            <button id="ai-plan-btn" class="btn" type="button">
+              <i class="fa-solid fa-wand-magic-sparkles"></i> Haftalık Planı AI ile Oluştur
+            </button>
+            <button id="clear-plan-btn" class="btn secondary" type="button">
+              <i class="fa-solid fa-trash"></i> Planı Temizle
+            </button>
+          </div>
+          <div class="row">
+            <button id="plan-to-market-btn" class="btn" type="button" title="Haftalık yemek planından gerekli market listesini çıkarır">
+              <i class="fa-solid fa-list-check"></i> Plan’dan Market Listesi Oluştur
+            </button>
+            <button id="plan-variety-btn" class="btn secondary" type="button" title="Sürdürülebilir ve çeşitli offline plan üretir">
+              <i class="fa-solid fa-seedling"></i> Çeşitli & Sürdürülebilir Plan (Offline)
+            </button>
+          </div>
+          <div class="row">
+            <input
+              id="sport-goal-input"
+              type="text"
+              placeholder="Spor hedefi (örn: kas kütlesi / kilo verme / koşu)"
+              autocomplete="off"
+            />
+            <input
+              id="protein-target-input"
+              type="text"
+              placeholder="Protein hedefi (g/gün) • Örn: 110"
+              inputmode="numeric"
+              autocomplete="off"
+            />
+          </div>
+
+          <div class="planner-grid" id="planner-grid" aria-label="Haftalık Plan Grid"></div>
+          <div class="footer-note">
+            İpucu: Gün 12:00–17:00 arası yoğunsa öğle için “pratik/sandviç” tarzı öneriler otomatik ağırlık kazanır.
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <!-- Meal Recipe Modal -->
+    <div
+      id="meal-modal"
+      style="
+        position: fixed;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.55);
+        display: none;
+        align-items: center;
+        justify-content: center;
+        padding: 16px;
+        z-index: 9999;
+      "
+      role="dialog"
+      aria-modal="true"
+      aria-label="Tarif Detayı"
+    >
+      <div
+        class="card"
+        style="max-width: 760px; width: 100%; position: relative; padding: 16px"
+      >
+        <div class="card-header">
+          <div class="card-title">
+            <i class="fa-solid fa-utensils"></i>
+            <h2 id="meal-modal-title">Tarif</h2>
+          </div>
+          <button id="meal-modal-close" class="btn secondary" type="button" style="padding: 9px 12px">
+            <i class="fa-solid fa-xmark"></i> Kapat
+          </button>
+        </div>
+        <div class="recipe-box" style="min-height: auto">
+          <pre id="meal-modal-body" style="min-height: 160px">—</pre>
+        </div>
+      </div>
+    </div>
+
+    <!-- Feedback -->
+    <div class="fab">
+      <button id="feedback-btn" class="btn" type="button" title="Geri Bildirim Ver">
+        <i class="fa-solid fa-comment-dots"></i> Geri Bildirim Ver
+      </button>
+    </div>
+    <div style="max-width:1200px;margin:0 auto;padding:0 18px 28px;">
+      <div class="footer-note" style="text-align:center;">
+        <button id="feedback-footer-btn" class="btn secondary" type="button">
+          <i class="fa-solid fa-comment-dots"></i> Feedback / Geri Bildirim
+        </button>
+      </div>
+    </div>
+    <div
+      id="feedback-modal"
+      style="
+        position: fixed;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.55);
+        display: none;
+        align-items: center;
+        justify-content: center;
+        padding: 16px;
+        z-index: 10001;
+      "
+      role="dialog"
+      aria-modal="true"
+      aria-label="Geri Bildirim Formu"
+    >
+      <div class="card" style="max-width: 760px; width: 100%; position: relative; padding: 16px">
+        <div class="card-header">
+          <div class="card-title">
+            <i class="fa-solid fa-flag"></i>
+            <h2>Geri Bildirim</h2>
+          </div>
+          <button id="feedback-close" class="btn secondary" type="button" style="padding: 9px 12px">
+            <i class="fa-solid fa-xmark"></i> Kapat
+          </button>
+        </div>
+        <div class="row">
+          <input id="feedback-title" type="text" placeholder="Kısa başlık (örn: Buton çalışmıyor)" />
+          <select id="feedback-type" aria-label="Geri Bildirim Tipi">
+            <option value="Bug">Hata (Bug)</option>
+            <option value="Idea">Öneri (Idea)</option>
+            <option value="Other">Diğer</option>
+          </select>
+        </div>
+        <div style="margin-top: 10px">
+          <textarea
+            id="feedback-body"
+            style="width: 100%; min-height: 120px"
+            placeholder="Ne oldu? Beklenen neydi? (isteğe bağlı ekran bilgisi/konum)"
+          ></textarea>
+        </div>
+        <div class="row" style="margin-top: 10px">
+          <button id="feedback-submit" class="btn" type="button">
+            <i class="fa-solid fa-paper-plane"></i> Gönder
+          </button>
+          <button id="feedback-clear" class="btn secondary" type="button">
+            <i class="fa-solid fa-trash"></i> Formu Temizle
+          </button>
+        </div>
+        <div class="footer-note">
+          Not: Şimdilik geri bildirimler cihazında localStorage’a kaydedilir.
+        </div>
+      </div>
+    </div>
+
+    <script src="./app.js"></script>
+  </body>
+</html>
